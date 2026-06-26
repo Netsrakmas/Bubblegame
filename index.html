@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bubblegame</title>
+  <style>
+    :root { --bg: #0d0820; --ink: #e9e4ff; --accent: #a8f0c6; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: radial-gradient(circle at 50% 20%, #241846, var(--bg));
+      color: var(--ink);
+      font-family: "Courier New", monospace;
+      display: flex; flex-direction: column; align-items: center;
+      min-height: 100%; padding: 16px; gap: 12px;
+    }
+    h1 { margin: 4px 0 0; letter-spacing: 4px; color: var(--accent);
+         text-shadow: 2px 2px 0 #4f2d8a; font-size: 22px; }
+    .wrap {
+      image-rendering: pixelated; image-rendering: crisp-edges;
+      border: 4px solid #4f2d8a; border-radius: 8px;
+      box-shadow: 0 0 0 4px #1a0f33, 0 12px 30px rgba(0,0,0,.5);
+      background: #120a26;
+    }
+    canvas#game {
+      display: block; width: 768px; height: 672px;   /* 256x224 * 3 */
+      image-rendering: pixelated;
+    }
+    .links a {
+      color: #ffd23f; text-decoration: none; margin: 0 10px;
+      border-bottom: 2px dotted #ffd23f55;
+    }
+    .links a:hover { color: #fff1a6; }
+    .hint { color: #bfe3ff; font-size: 13px; opacity: .85; }
+    @media (max-width: 800px) {
+      canvas#game { width: 100vw; height: calc(100vw * 0.875); }
+    }
+  </style>
+</head>
+<body>
+  <h1>🫧 BUBBLEGAME</h1>
+  <div class="wrap"><canvas id="game"></canvas></div>
+  <div class="hint">←/→ move &nbsp;·&nbsp; ↑ / Space jump &nbsp;·&nbsp; Z / J fire bubble &nbsp;·&nbsp; R restart</div>
+  <div class="links">
+    <a href="tools/sprite-editor.html">🎨 Sprite Editor</a>
+    <a href="tools/map-editor.html">🗺️ Map Editor</a>
+  </div>
+
+  <!-- classic scripts (no bundler) so this runs by just opening the file -->
+  <script src="js/palette.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

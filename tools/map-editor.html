@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bubblegame · Map Editor</title>
+<style>
+  :root { --bg:#0d0820; --panel:#1c1240; --ink:#e9e4ff; --accent:#a8f0c6; --gold:#ffd23f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(circle at 50% 0%,#241846,var(--bg)); color:var(--ink);
+         font-family:"Courier New",monospace; padding:16px; }
+  h1 { color:var(--accent); letter-spacing:3px; margin:0 0 4px; text-shadow:2px 2px 0 #4f2d8a; }
+  a.back { color:var(--gold); text-decoration:none; }
+  .app { display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; align-items:flex-start; }
+  .panel { background:var(--panel); border:2px solid #4f2d8a; border-radius:8px; padding:12px; }
+  .scroll { max-width:78vw; max-height:70vh; overflow:auto; border:2px solid #4f2d8a; border-radius:6px; background:#120a26; }
+  canvas#map { image-rendering:pixelated; display:block; cursor:crosshair; }
+  button, select { font-family:inherit; background:#321d6b; color:var(--ink); border:2px solid #4f2d8a; border-radius:6px; padding:6px 10px; cursor:pointer; margin:2px; }
+  button:hover { background:#43289a; }
+  button.primary { background:#2a7d57; border-color:#36c98f; color:#eafff4; }
+  button.sel { outline:3px solid var(--gold); outline-offset:1px; }
+  .tilebtn { display:flex; align-items:center; gap:8px; width:100%; justify-content:flex-start; }
+  .tilebtn .chip { width:20px; height:20px; border-radius:4px; border:1px solid #0006; }
+  label { font-size:13px; color:#bfe3ff; }
+  input[type=text],input[type=number] { font-family:inherit; background:#120a26; color:var(--ink);
+        border:2px solid #4f2d8a; border-radius:6px; padding:6px; width:70px; }
+  textarea { width:100%; height:160px; background:#120a26; color:#a8f0c6; border:2px solid #4f2d8a; border-radius:6px; font-family:inherit; font-size:11px; }
+  .row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0; }
+  small { color:#9b8fd0; }
+</style>
+</head>
+<body>
+  <h1>🗺️ MAP EDITOR</h1>
+  <a class="back" href="../index.html">← back to game</a>
+
+  <div class="app">
+    <!-- tools -->
+    <div class="panel" style="min-width:220px">
+      <label>paint tile</label>
+      <div id="tiles"></div>
+      <hr style="border-color:#4f2d8a">
+      <div class="row"><label>W</label><input type="number" id="w" value="40" min="8" max="200">
+        <label>H</label><input type="number" id="h" value="24" min="8" max="120">
+        <button id="resize">resize</button></div>
+      <div class="row">
+        <button id="border">⬛ add border</button>
+        <button id="clear">🗑 clear</button>
+      </div>
+      <div class="row">
+        <label>load built-in</label>
+        <select id="builtins"></select>
+      </div>
+      <small>Left-click / drag to paint. Player start (P) and Exit (E) are unique — placing a new one moves it.</small>
+    </div>
+
+    <!-- map -->
+    <div class="panel">
+      <div class="scroll"><canvas id="map"></canvas></div>
+      <div class="row" style="margin-top:8px">
+        <label>name</label><input type="text" id="name" value="My Cavern" style="width:200px">
+        <button id="save" class="primary">💾 save to game</button>
+        <button id="play" onclick="location.href='../index.html'">▶ play</button>
+      </div>
+      <small id="status">—</small>
+    </div>
+
+    <!-- io -->
+    <div class="panel" style="min-width:260px; flex:1">
+      <label>rows (paste into js/levels.js or share)</label>
+      <textarea id="io" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="exportBtn">⬆ export ↑</button>
+        <button id="importBtn">⬇ import from box</button>
+      </div>
+      <small>Legend &nbsp; <b>#</b> solid &nbsp; <b>=</b> platform &nbsp; <b>E</b> exit &nbsp; <b>P</b> player &nbsp; <b>x</b> enemy &nbsp; <b>.</b> air</small>
+    </div>
+  </div>
+
+<script src="../js/palette.js"></script>
+<script src="../js/sprites.js"></script>
+<script src="../js/levels.js"></script>
+<script>
+const PX = 20;                // on-screen pixels per tile
+let W = 40, H = 24;
+let grid = [];               // 2D array of chars
+let paintCh = '#';
+let painting = false;
+
+const map = document.getElementById('map');
+const mx = map.getContext('2d');
+
+// pre-bake the tile/marker sprites for the preview
+const baked = {};
+for (const n of ['tile_block','tile_platform','tile_exit','player_idle','enemy_a'])
+  baked[n] = bakeSprite(SPRITES[n], 1);
+
+// ---- tile palette ----
+const TILE_DEFS = [
+  { ch:'.', name:'air',      color:'#241846' },
+  { ch:'#', name:'solid',    sprite:'tile_block' },
+  { ch:'=', name:'platform', sprite:'tile_platform' },
+  { ch:'E', name:'exit',     sprite:'tile_exit' },
+  { ch:'P', name:'player',   sprite:'player_idle' },
+  { ch:'x', name:'enemy',    sprite:'enemy_a' },
+];
+const tilesWrap = document.getElementById('tiles');
+TILE_DEFS.forEach(t=>{
+  const b=document.createElement('button'); b.className='tilebtn'+(t.ch===paintCh?' sel':'');
+  const chip=document.createElement('span'); chip.className='chip';
+  if(t.color) chip.style.background=t.color;
+  else { const c=document.createElement('canvas'); c.width=c.height=16; const cc=c.getContext('2d');
+         cc.imageSmoothingEnabled=false; cc.drawImage(baked[t.sprite],0,0); chip.appendChild(c);
+         chip.style.padding=0; chip.style.width='20px'; chip.style.height='20px'; chip.style.display='inline-block'; chip.innerHTML=''; chip.appendChild(c); c.style.width='20px'; c.style.height='20px'; c.style.imageRendering='pixelated'; }
+  b.appendChild(chip); b.appendChild(document.createTextNode(t.name+'  ['+t.ch+']'));
+  b.onclick=()=>{ paintCh=t.ch; document.querySelectorAll('.tilebtn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); };
+  tilesWrap.appendChild(b);
+});
+
+// ---- grid helpers ----
+function blank(w,h){ return Array.from({length:h},()=>Array(w).fill('.')); }
+function resizeGrid(w,h){
+  const g=blank(w,h);
+  for(let y=0;y<Math.min(h,grid.length);y++)
+    for(let x=0;x<Math.min(w,grid[0].length);x++) g[y][x]=grid[y][x];
+  grid=g; W=w; H=h; map.width=W*PX; map.height=H*PX; draw();
+}
+function addBorder(){
+  for(let x=0;x<W;x++){ grid[0][x]='#'; grid[H-1][x]='#'; }
+  for(let y=0;y<H;y++){ grid[y][0]='#'; grid[y][W-1]='#'; }
+  draw();
+}
+function uniquePut(x,y,ch){
+  if(ch==='P'||ch==='E'){ for(let j=0;j<H;j++)for(let i=0;i<W;i++) if(grid[j][i]===ch) grid[j][i]='.'; }
+  grid[y][x]=ch;
+}
+
+// ---- draw ----
+function draw(){
+  mx.imageSmoothingEnabled=false;
+  mx.fillStyle='#160d2e'; mx.fillRect(0,0,map.width,map.height);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const ch=grid[y][x];
+    const def=TILE_DEFS.find(t=>t.ch===ch);
+    if(def&&def.sprite) mx.drawImage(baked[def.sprite],0,0,16,16,x*PX,y*PX,PX,PX);
+  }
+  // grid lines
+  mx.strokeStyle='rgba(255,255,255,0.06)';
+  for(let x=0;x<=W;x++){ mx.beginPath(); mx.moveTo(x*PX,0); mx.lineTo(x*PX,H*PX); mx.stroke(); }
+  for(let y=0;y<=H;y++){ mx.beginPath(); mx.moveTo(0,y*PX); mx.lineTo(W*PX,y*PX); mx.stroke(); }
+  updateStatus();
+}
+function updateStatus(){
+  let enemies=0,hasP=false,hasE=false;
+  for(const row of grid)for(const c of row){ if(c==='x')enemies++; if(c==='P')hasP=true; if(c==='E')hasE=true; }
+  document.getElementById('status').textContent =
+    `${W}×${H} tiles · enemies:${enemies} · player:${hasP?'set':'MISSING'} · exit:${hasE?'set':'MISSING'}`;
+}
+
+// ---- mouse ----
+function cell(e){ const r=map.getBoundingClientRect();
+  const x=Math.floor((e.clientX-r.left)/(r.width/W)), y=Math.floor((e.clientY-r.top)/(r.height/H));
+  return (x>=0&&x<W&&y>=0&&y<H)?{x,y}:null; }
+map.addEventListener('mousedown',e=>{ painting=true; const c=cell(e); if(c){uniquePut(c.x,c.y,paintCh); draw();} });
+map.addEventListener('mousemove',e=>{ if(!painting)return; const c=cell(e); if(c){
+  if(paintCh==='P'||paintCh==='E') return; // don't smear uniques
+  grid[c.y][c.x]=paintCh; draw(); } });
+window.addEventListener('mouseup',()=>painting=false);
+
+// ---- buttons ----
+document.getElementById('resize').onclick=()=>resizeGrid(+document.getElementById('w').value, +document.getElementById('h').value);
+document.getElementById('border').onclick=addBorder;
+document.getElementById('clear').onclick=()=>{ grid=blank(W,H); draw(); };
+
+const sel=document.getElementById('builtins');
+sel.innerHTML='<option value="">— pick —</option>'+LEVELS.map((l,i)=>`<option value="${i}">${l.name}</option>`).join('');
+sel.onchange=()=>{ if(sel.value==='')return; loadRows(LEVELS[+sel.value].rows); document.getElementById('name').value=LEVELS[+sel.value].name; };
+
+function loadRows(rowsArr){
+  H=rowsArr.length; W=rowsArr[0].length;
+  document.getElementById('w').value=W; document.getElementById('h').value=H;
+  grid=rowsArr.map(r=>r.split(''));
+  map.width=W*PX; map.height=H*PX; draw();
+}
+const toRows=()=>grid.map(r=>r.join(''));
+
+// ---- save to game ----
+document.getElementById('save').onclick=()=>{
+  let hasP=false,hasE=false;
+  for(const row of grid)for(const c of row){ if(c==='P')hasP=true; if(c==='E')hasE=true; }
+  if(!hasP||!hasE){ if(!confirm('Map is missing a '+(!hasP?'player start':'')+(!hasP&&!hasE?' and ':'')+(!hasE?'exit':'')+'. Save anyway?')) return; }
+  const lvl={ name:document.getElementById('name').value.trim()||'Custom', tileSize:16, rows:toRows() };
+  localStorage.setItem('bubblegame.level', JSON.stringify(lvl));
+  alert('Saved! Open / refresh the game tab (or press R) to play it.');
+};
+
+// ---- export / import ----
+document.getElementById('exportBtn').onclick=()=>{
+  const name=document.getElementById('name').value.trim()||'Custom';
+  const body=toRows().map(r=>`    '${r}',`).join('\n');
+  document.getElementById('io').value=`{\n  name: '${name}',\n  tileSize: 16,\n  rows: [\n${body}\n  ],\n}`;
+};
+document.getElementById('importBtn').onclick=()=>{
+  const m=document.getElementById('io').value.match(/'([.#=ExP]+)'/g);
+  if(!m){ alert('No rows found. Paste lines like \'##..==..E\''); return; }
+  loadRows(m.map(s=>s.replace(/'/g,'')));
+};
+
+// boot: start from the built-in level
+loadRows(LEVELS[0].rows);
+document.getElementById('name').value=LEVELS[0].name;
+</script>
+</body>
+</html>

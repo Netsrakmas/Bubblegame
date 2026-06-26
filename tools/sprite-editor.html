@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bubblegame · Sprite Editor</title>
+<style>
+  :root { --bg:#0d0820; --panel:#1c1240; --ink:#e9e4ff; --accent:#a8f0c6; --gold:#ffd23f; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:radial-gradient(circle at 50% 0%,#241846,var(--bg)); color:var(--ink);
+         font-family:"Courier New",monospace; padding:16px; }
+  h1 { color:var(--accent); letter-spacing:3px; margin:0 0 4px; text-shadow:2px 2px 0 #4f2d8a; }
+  a.back { color:var(--gold); text-decoration:none; }
+  .app { display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; }
+  .panel { background:var(--panel); border:2px solid #4f2d8a; border-radius:8px; padding:12px; }
+  canvas { image-rendering:pixelated; display:block; }
+  #grid { cursor:crosshair; background:#241846; border:1px solid #4f2d8a; }
+  .swatches { display:grid; grid-template-columns:repeat(4,28px); gap:6px; }
+  .sw { width:28px; height:28px; border-radius:4px; border:2px solid #00000055; cursor:pointer; }
+  .sw.sel { outline:3px solid var(--gold); outline-offset:1px; }
+  .checker { background-image:linear-gradient(45deg,#555 25%,transparent 25%),linear-gradient(-45deg,#555 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#555 75%),linear-gradient(-45deg,transparent 75%,#555 75%);
+             background-size:10px 10px; background-position:0 0,0 5px,5px -5px,-5px 0; background-color:#888; }
+  button, select { font-family:inherit; background:#321d6b; color:var(--ink); border:2px solid #4f2d8a;
+            border-radius:6px; padding:6px 10px; cursor:pointer; margin:2px; }
+  button:hover { background:#43289a; }
+  button.primary { background:#2a7d57; border-color:#36c98f; color:#eafff4; }
+  label { font-size:13px; color:#bfe3ff; }
+  input[type=text] { font-family:inherit; background:#120a26; color:var(--ink); border:2px solid #4f2d8a; border-radius:6px; padding:6px; }
+  textarea { width:100%; height:150px; background:#120a26; color:#a8f0c6; border:2px solid #4f2d8a; border-radius:6px; font-family:inherit; font-size:12px; }
+  .row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0; }
+  .preview { display:flex; gap:14px; align-items:flex-end; }
+  small { color:#9b8fd0; }
+</style>
+</head>
+<body>
+  <h1>🎨 SPRITE EDITOR</h1>
+  <a class="back" href="../index.html">← back to game</a>
+
+  <div class="app">
+    <!-- palette -->
+    <div class="panel">
+      <label>palette</label>
+      <div class="swatches" id="swatches"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="tool-pencil" class="primary">✏️ pencil</button>
+        <button id="tool-fill">🪣 fill</button>
+        <button id="tool-pick">🎯 pick</button>
+      </div>
+      <div class="row">
+        <button id="flipH">⇋ flip</button>
+        <button id="flipV">⇅ flip</button>
+        <button id="clear">🗑 clear</button>
+      </div>
+      <div class="row">
+        <button data-shift="up">▲</button>
+        <button data-shift="left">◀</button>
+        <button data-shift="right">▶</button>
+        <button data-shift="down">▼</button>
+        <small>nudge</small>
+      </div>
+    </div>
+
+    <!-- editing grid -->
+    <div class="panel">
+      <canvas id="grid" width="512" height="512"></canvas>
+    </div>
+
+    <!-- right column -->
+    <div class="panel" style="min-width:280px; flex:1">
+      <div class="preview">
+        <div><small>1×</small><br><canvas id="p1" width="16" height="16" style="background:#241846"></canvas></div>
+        <div><small>3×</small><br><canvas id="p3" width="48" height="48" style="background:#241846"></canvas></div>
+        <div><small>6×</small><br><canvas id="p6" width="96" height="96" style="background:#241846"></canvas></div>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <label>load built-in</label>
+        <select id="builtins"></select>
+      </div>
+      <div class="row">
+        <label>name</label>
+        <input type="text" id="name" value="player_idle" size="16" />
+      </div>
+      <div class="row">
+        <button id="save" class="primary">💾 save to game</button>
+        <button id="del">remove from game</button>
+      </div>
+      <small>“save to game” stores this sprite in your browser; the game tab picks it up live. Names matching the game’s
+      (player_idle, enemy_a, bubble, tile_block …) replace that art.</small>
+
+      <div class="row" style="margin-top:12px"><label>rows (copy into js/sprites.js or share)</label></div>
+      <textarea id="io" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="exportBtn">⬆ export ↑</button>
+        <button id="importBtn">⬇ import from box</button>
+      </div>
+    </div>
+  </div>
+
+<script src="../js/palette.js"></script>
+<script src="../js/sprites.js"></script>
+<script>
+const W = 16, H = 16, CELL = 32;
+let pixels = Array.from({length:H}, () => Array(W).fill('.'));
+let curChar = '8';           // current colour (default green)
+let tool = 'pencil';
+let painting = false;
+
+const grid = document.getElementById('grid');
+const gx = grid.getContext('2d');
+grid.width = W*CELL; grid.height = H*CELL;
+
+// hex char for a palette index (0 -> transparent '.')
+const idxToChar = i => i === 0 ? '.' : i.toString(16);
+
+// ---- build palette swatches ----
+const swWrap = document.getElementById('swatches');
+for (let i = 0; i < PALETTE.length; i++) {
+  const d = document.createElement('div');
+  d.className = 'sw' + (idxToChar(i) === curChar ? ' sel' : '');
+  if (i === 0) d.classList.add('checker');
+  else d.style.background = PALETTE[i];
+  d.title = i === 0 ? 'transparent' : '#' + i.toString(16);
+  d.onclick = () => { curChar = idxToChar(i); document.querySelectorAll('.sw').forEach(s=>s.classList.remove('sel')); d.classList.add('sel'); };
+  swWrap.appendChild(d);
+}
+
+// ---- drawing the grid ----
+function drawCheckerCell(x,y){
+  gx.fillStyle = ((x+y)%2)?'#3a2e5e':'#2f2550';
+  gx.fillRect(x*CELL,y*CELL,CELL,CELL);
+}
+function redraw(){
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const ch=pixels[y][x];
+    if(ch==='.') drawCheckerCell(x,y);
+    else { gx.fillStyle = charToColor(ch)||'#000'; gx.fillRect(x*CELL,y*CELL,CELL,CELL); }
+  }
+  gx.strokeStyle='rgba(255,255,255,0.08)'; gx.lineWidth=1;
+  for(let i=0;i<=W;i++){ gx.beginPath(); gx.moveTo(i*CELL,0); gx.lineTo(i*CELL,H*CELL); gx.stroke(); }
+  for(let i=0;i<=H;i++){ gx.beginPath(); gx.moveTo(0,i*CELL); gx.lineTo(W*CELL,i*CELL); gx.stroke(); }
+  updatePreviews();
+}
+
+function cellFromEvent(e){
+  const r=grid.getBoundingClientRect();
+  const x=Math.floor((e.clientX-r.left)/(r.width/W));
+  const y=Math.floor((e.clientY-r.top)/(r.height/H));
+  return (x>=0&&x<W&&y>=0&&y<H)?{x,y}:null;
+}
+function applyAt(x,y){
+  if(tool==='pencil') pixels[y][x]=curChar;
+  else if(tool==='pick'){ curChar=pixels[y][x]; selectSwatch(curChar); }
+  else if(tool==='fill') flood(x,y,pixels[y][x],curChar);
+}
+function flood(x,y,from,to){
+  if(from===to) return;
+  const st=[[x,y]];
+  while(st.length){ const [cx,cy]=st.pop();
+    if(cx<0||cy<0||cx>=W||cy>=H||pixels[cy][cx]!==from) continue;
+    pixels[cy][cx]=to; st.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
+  }
+}
+function selectSwatch(ch){
+  document.querySelectorAll('.sw').forEach((s,i)=>s.classList.toggle('sel', idxToChar(i)===ch));
+}
+grid.addEventListener('mousedown', e=>{ painting=true; const c=cellFromEvent(e); if(c){applyAt(c.x,c.y); redraw();} });
+grid.addEventListener('mousemove', e=>{ if(!painting||tool!=='pencil')return; const c=cellFromEvent(e); if(c){pixels[c.y][c.x]=curChar; redraw();} });
+window.addEventListener('mouseup', ()=>painting=false);
+
+// ---- previews ----
+function blit(canvas, scale){
+  const c=canvas.getContext('2d'); c.imageSmoothingEnabled=false; c.clearRect(0,0,canvas.width,canvas.height);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){ const col=charToColor(pixels[y][x]); if(col){c.fillStyle=col; c.fillRect(x*scale,y*scale,scale,scale);} }
+}
+function updatePreviews(){ blit(document.getElementById('p1'),1); blit(document.getElementById('p3'),3); blit(document.getElementById('p6'),6); }
+
+// ---- tools ----
+function setTool(t){ tool=t; ['pencil','fill','pick'].forEach(n=>document.getElementById('tool-'+n).classList.toggle('primary', n===t)); }
+document.getElementById('tool-pencil').onclick=()=>setTool('pencil');
+document.getElementById('tool-fill').onclick=()=>setTool('fill');
+document.getElementById('tool-pick').onclick=()=>setTool('pick');
+document.getElementById('clear').onclick=()=>{ pixels=Array.from({length:H},()=>Array(W).fill('.')); redraw(); };
+document.getElementById('flipH').onclick=()=>{ pixels=pixels.map(r=>r.slice().reverse()); redraw(); };
+document.getElementById('flipV').onclick=()=>{ pixels=pixels.slice().reverse(); redraw(); };
+document.querySelectorAll('[data-shift]').forEach(b=>b.onclick=()=>{
+  const d=b.dataset.shift, blank=()=>Array(W).fill('.');
+  if(d==='up'){ pixels.push(pixels.shift()); }
+  if(d==='down'){ pixels.unshift(pixels.pop()); }
+  if(d==='left'){ pixels=pixels.map(r=>{const x=r.slice(); x.push(x.shift()); return x;}); }
+  if(d==='right'){ pixels=pixels.map(r=>{const x=r.slice(); x.unshift(x.pop()); return x;}); }
+  redraw();
+});
+
+// ---- built-ins dropdown ----
+const sel=document.getElementById('builtins');
+sel.innerHTML='<option value="">— pick —</option>'+Object.keys(SPRITES).map(n=>`<option>${n}</option>`).join('');
+sel.onchange=()=>{ const n=sel.value; if(!n)return; loadRows(SPRITES[n]); document.getElementById('name').value=n; };
+
+function loadRows(rowsArr){
+  pixels=Array.from({length:H},(_,y)=> (rowsArr[y]||'').padEnd(W,'.').slice(0,W).split('') );
+  redraw();
+}
+const toRows = ()=> pixels.map(r=>r.join(''));
+
+// ---- save / load to the game (localStorage) ----
+function readStore(){ try{return JSON.parse(localStorage.getItem('bubblegame.sprites')||'{}');}catch(e){return {};} }
+document.getElementById('save').onclick=()=>{
+  const name=document.getElementById('name').value.trim(); if(!name)return alert('name?');
+  const s=readStore(); s[name]=toRows(); localStorage.setItem('bubblegame.sprites', JSON.stringify(s));
+  alert('Saved “'+name+'”. Switch to the game tab — it updates live (or press R).');
+};
+document.getElementById('del').onclick=()=>{
+  const name=document.getElementById('name').value.trim(); const s=readStore();
+  if(s[name]){ delete s[name]; localStorage.setItem('bubblegame.sprites', JSON.stringify(s)); alert('Removed “'+name+'” override.'); }
+};
+
+// ---- export / import text ----
+document.getElementById('exportBtn').onclick=()=>{
+  const name=document.getElementById('name').value.trim()||'sprite';
+  const body=toRows().map(r=>`    '${r}',`).join('\n');
+  document.getElementById('io').value=`  ${name}: [\n${body}\n  ],`;
+};
+document.getElementById('importBtn').onclick=()=>{
+  const txt=document.getElementById('io').value;
+  const found=txt.match(/'([.0-9a-f]{1,16})'/g);
+  if(!found){ alert('No rows found. Paste lines like \'..88..\''); return; }
+  loadRows(found.map(s=>s.replace(/'/g,'')));
+};
+
+setTool('pencil');
+loadRows(SPRITES.player_idle);
+</script>
+</body>
+</html>
