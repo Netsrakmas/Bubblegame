@@ -19,10 +19,12 @@
 
   // ---- physics tuning (units: pixels & pixels/frame at 60fps) ----
   const GRAVITY = 0.4;
-  const MOVE_SPEED = 1.5;
-  const ACCEL = 0.4;
-  const FRICTION = 0.55;
+  const MOVE_SPEED = 1.6;
+  const ACCEL = 0.7;         // snappier: reach top speed / flip direction fast
+  const FRICTION = 0.5;
   const JUMP_V = 7.3;        // ~4 tiles of jump height
+  const COYOTE = 6;          // frames you can still jump after leaving a ledge
+  const JUMP_BUFFER = 7;     // frames a jump press is remembered before landing
   const ENEMY_SPEED = 0.5;
   const BUBBLE_SHOT_SPEED = 4;
   const BUBBLE_SHOT_FRAMES = 16;
@@ -120,7 +122,7 @@
 
   function makePlayer() {
     return { x: playerSpawn.x, y: playerSpawn.y, w: 12, h: 14, vx: 0, vy: 0,
-      face: 1, onGround: false, invuln: 0, fireCd: 0 };
+      face: 1, onGround: false, invuln: 0, fireCd: 0, coyote: 0, jumpBuf: 0 };
   }
   function makeEnemy(s) {
     return { x: s.x, y: s.y, w: 12, h: 12, vx: 0, vy: 0, dir: Math.random() < 0.5 ? -1 : 1, onGround: false };
@@ -163,9 +165,12 @@
     if (Math.abs(p.vx) < 0.05) p.vx = 0;
     p.vx = Math.max(-MOVE_SPEED, Math.min(MOVE_SPEED, p.vx));
 
-    // jump (variable height)
-    if (Input.pressed('jump') && p.onGround) p.vy = -JUMP_V;
-    if (!Input.jump && p.vy < -2) p.vy = -2; // cut jump when released
+    // jump with coyote-time + input buffering (forgiving on touch)
+    if (Input.pressed('jump')) p.jumpBuf = JUMP_BUFFER;
+    if (p.jumpBuf > 0) p.jumpBuf--;
+    if (p.coyote > 0) p.coyote--;
+    if (p.jumpBuf > 0 && p.coyote > 0) { p.vy = -JUMP_V; p.jumpBuf = 0; p.coyote = 0; }
+    if (!Input.jump && p.vy < -2) p.vy = -2; // variable height: cut when released
 
     // gravity
     p.vy = Math.min(p.vy + GRAVITY, 9);
@@ -173,6 +178,7 @@
     p.hitWall = false;
     moveX(p);
     moveY(p);
+    if (p.onGround) p.coyote = COYOTE; // refresh the moment we're grounded
 
     // fire bubble
     if (p.fireCd > 0) p.fireCd--;

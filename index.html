@@ -32,22 +32,27 @@
     .links a { color: #ffd23f; text-decoration: none; margin: 0 10px; }
     .links a:hover { color: #fff1a6; }
 
-    /* ---- on-screen touch controls ---- */
-    #pad { display: none; width: 100%; max-width: 768px;
-           justify-content: space-between; align-items: center; gap: 14px;
-           user-select: none; -webkit-user-select: none; touch-action: none; }
+    /* ---- on-screen touch controls (sized with vw so they fit any phone) ---- */
+    #pad { display: none; position: relative; width: 100%; max-width: 768px;
+           justify-content: space-between; align-items: center;
+           user-select: none; -webkit-user-select: none; touch-action: none; padding: 0 6px; }
     #pad.show { display: flex; }
-    .cluster { display: flex; gap: 14px; }
+    .cluster { display: flex; gap: clamp(10px, 3vw, 18px); align-items: center; }
     .btn {
-      width: 66px; height: 66px; border-radius: 50%;
+      width: clamp(54px, 17vw, 76px); height: clamp(54px, 17vw, 76px); border-radius: 50%;
       border: 3px solid #6a44c0; background: #2c1a5c; color: #e9e4ff;
-      font-size: 26px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+      font-size: clamp(22px, 7vw, 32px); font-weight: bold;
+      display: flex; align-items: center; justify-content: center;
       touch-action: none; user-select: none; box-shadow: 0 4px 0 #1a0f33;
+      transition: transform .04s, background .04s;
     }
-    .btn:active, .btn.held { background: #4a2e9c; transform: translateY(3px); box-shadow: 0 1px 0 #1a0f33; }
+    .btn.held { background: #5a39c0; transform: translateY(3px); box-shadow: 0 1px 0 #1a0f33; }
     .btn.fire { background: #2a7d57; border-color: #36c98f; }
-    .btn.fire.held { background: #38a06f; }
-    .btn.small { width: 48px; height: 48px; font-size: 18px; }
+    .btn.fire.held { background: #41a877; }
+    /* restart: small, centred between the thumb clusters, out of the way */
+    .btn.small.restart { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: clamp(40px, 11vw, 50px); height: clamp(40px, 11vw, 50px); font-size: clamp(16px, 5vw, 20px); opacity: .8; }
+    .btn.small.restart.held { transform: translate(-50%, -50%) scale(.92); }
   </style>
 </head>
 <body>
@@ -59,8 +64,8 @@
       <div class="btn" data-act="left">◀</div>
       <div class="btn" data-act="right">▶</div>
     </div>
+    <div class="btn small restart" data-act="restart">↻</div>
     <div class="cluster">
-      <div class="btn small" data-act="restart">↻</div>
       <div class="btn fire" data-act="fire">●</div>
       <div class="btn" data-act="jump">▲</div>
     </div>
@@ -81,31 +86,62 @@
   <script src="js/game.js"></script>
 
   <script>
-    // Show touch controls on touch-capable / coarse-pointer devices.
+    // ---- multi-touch virtual gamepad ----------------------------------
+    // Instead of per-button enter/leave (which drops input the moment your
+    // thumb drifts), we track every active pointer, hit-test which button
+    // it's over each move, and drive the held inputs from the union. This
+    // makes it slide-friendly (roll thumb ◀↔▶) and fully multi-touch
+    // (hold a direction + jump + fire at the same time).
     const pad = document.getElementById('pad');
     const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) ||
                     window.matchMedia('(pointer: coarse)').matches;
     if (isTouch) pad.classList.add('show');
 
-    // Wire each button to the game's virtual input via pointer events.
-    pad.querySelectorAll('.btn').forEach((b) => {
-      const act = b.dataset.act;
-      const press = (e) => { e.preventDefault();
-        if (act === 'restart') Input.pulse('restart');
-        else Input.setVirtual(act, true);
-        b.classList.add('held'); };
-      const release = (e) => { e.preventDefault();
-        if (act !== 'restart') Input.setVirtual(act, false);
-        b.classList.remove('held'); };
-      b.addEventListener('pointerdown', press);
-      b.addEventListener('pointerup', release);
-      b.addEventListener('pointercancel', release);
-      b.addEventListener('pointerleave', release);
+    const btns = [...pad.querySelectorAll('.btn')];
+    const HOLD = ['left', 'right', 'jump', 'fire'];
+    const pointers = new Map(); // pointerId -> held action
+
+    function hitAct(x, y) {
+      for (const b of btns) {
+        const r = b.getBoundingClientRect();
+        const pad6 = 8; // fat-finger forgiveness
+        if (x >= r.left - pad6 && x <= r.right + pad6 && y >= r.top - pad6 && y <= r.bottom + pad6)
+          return b.dataset.act;
+      }
+      return null;
+    }
+    function refresh() {
+      const held = new Set(pointers.values());
+      HOLD.forEach((a) => Input.setVirtual(a, held.has(a)));
+      btns.forEach((b) => b.classList.toggle('held', held.has(b.dataset.act)));
+    }
+    function flash(act) {
+      const b = btns.find((x) => x.dataset.act === act);
+      if (b) { b.classList.add('held'); setTimeout(() => b.classList.remove('held'), 110); }
+    }
+    pad.addEventListener('pointerdown', (e) => {
+      const a = hitAct(e.clientX, e.clientY);
+      if (!a) return;
+      e.preventDefault();
+      if (a === 'restart') { Input.pulse('restart'); flash('restart'); return; }
+      try { pad.setPointerCapture(e.pointerId); } catch (_) {} // keep moves even if finger leaves the button
+      pointers.set(e.pointerId, a);
+      refresh();
     });
+    pad.addEventListener('pointermove', (e) => {
+      if (!pointers.has(e.pointerId)) return; // only pointers we're tracking
+      e.preventDefault();
+      const a = hitAct(e.clientX, e.clientY);
+      if (a && a !== 'restart') pointers.set(e.pointerId, a);
+      else pointers.delete(e.pointerId);
+      refresh();
+    });
+    const lift = (e) => { if (pointers.delete(e.pointerId)) refresh(); };
+    pad.addEventListener('pointerup', lift);
+    pad.addEventListener('pointercancel', lift);
 
     // Tap the screen to start / confirm (title, win, game-over).
-    const cv = document.getElementById('game');
-    cv.addEventListener('pointerdown', (e) => { e.preventDefault(); Input.pulse('start'); });
+    document.getElementById('game').addEventListener('pointerdown', () => Input.pulse('start'));
   </script>
 </body>
 </html>
