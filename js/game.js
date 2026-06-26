@@ -272,12 +272,10 @@
     camY = Math.max(0, Math.min(levelPxH - VIEW_H, (p.y + p.h / 2) - VIEW_H / 2));
     camX = Math.round(camX); camY = Math.round(camY);
 
-    // sky background
-    const g = ctx.createLinearGradient(0, 0, 0, VIEW_H);
-    g.addColorStop(0, '#2a1e4f'); g.addColorStop(1, '#120a26');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    // parallax dots
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    // solid cavern sky (no gradient -> every pixel is a flat colour)
+    ctx.fillStyle = '#1a0f33'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    // solid parallax stars
+    ctx.fillStyle = '#3a2e6e';
     for (let i = 0; i < 40; i++) {
       const sx = (i * 71 - camX * 0.3) % VIEW_W, sy = (i * 53) % VIEW_H;
       ctx.fillRect((sx + VIEW_W) % VIEW_W, sy, 1, 1);
@@ -306,7 +304,7 @@
         const e = b.enemy;
         ctx.save();
         ctx.translate(b.x + b.w / 2, b.y + b.h / 2);
-        ctx.scale(0.55, 0.55);
+        ctx.scale(0.5, 0.5); // clean half-size -> stays solid pixels
         drawSprite('enemy_a', -8, -8, e.dir < 0);
         ctx.restore();
       }
@@ -329,36 +327,53 @@
 
     drawHUD();
     if (state === 'title') drawTitle();
-    if (state === 'win') drawCenter('YOU FOUND THE EXIT!', '#a8f0c6', 'Enter = play again');
-    if (state === 'over') drawCenter('GAME OVER', '#ff6b6b', 'Enter = retry');
+    if (state === 'win') drawCenter('YOU FOUND THE EXIT!', '#a8f0c6', 'ENTER / TAP - PLAY AGAIN');
+    if (state === 'over') drawCenter('GAME OVER', '#ff6b6b', 'ENTER / TAP - RETRY');
   }
 
-  function text(s, x, y, color, size = 8, align = 'left') {
-    ctx.font = `${size}px "Courier New", monospace`;
-    ctx.textAlign = align; ctx.textBaseline = 'top';
-    ctx.fillStyle = '#1a1230'; ctx.fillText(s, x + 1, y + 1);
-    ctx.fillStyle = color; ctx.fillText(s, x, y);
+  // ---- solid-pixel bitmap text (font.js) ----
+  function glyphBlit(ch, x, y, scale, color) {
+    const g = FONT[ch]; if (!g) return;
+    ctx.fillStyle = color;
+    for (let r = 0; r < 7; r++) {
+      const row = g[r];
+      for (let c = 0; c < 5; c++) if (row[c] === '#') ctx.fillRect(x + c * scale, y + r * scale, scale, scale);
+    }
+  }
+  function textW(str, scale) { return str.length ? str.length * 6 * scale - scale : 0; }
+  function text(str, x, y, color, scale = 1, align = 'left') {
+    str = String(str).toUpperCase();
+    let sx = x;
+    if (align === 'center') sx = x - textW(str, scale) / 2;
+    else if (align === 'right') sx = x - textW(str, scale);
+    sx = Math.round(sx); y = Math.round(y);
+    for (let i = 0; i < str.length; i++) {
+      const gx = sx + i * 6 * scale;
+      glyphBlit(str[i], gx + scale, y + scale, scale, '#0d0820'); // drop shadow
+      glyphBlit(str[i], gx, y, scale, color);
+    }
   }
   function drawHUD() {
-    ctx.fillStyle = 'rgba(20,10,40,0.55)'; ctx.fillRect(0, 0, VIEW_W, 12);
-    text('LIVES ' + '♥'.repeat(Math.max(0, lives)), 4, 2, '#ff8fb1');
-    text('SCORE ' + String(score).padStart(5, '0'), 150, 2, '#fff1a6');
-    text('ENEMIES LEFT ' + enemies.length, 4, VIEW_H - 11, '#bfe3ff');
-    if (msgTimer > 0) text('Find the exit →', VIEW_W / 2, 16, '#ffd23f', 8, 'center');
+    ctx.fillStyle = '#140a28'; ctx.fillRect(0, 0, VIEW_W, 11); // opaque HUD bar
+    ctx.fillStyle = '#140a28'; ctx.fillRect(0, VIEW_H - 11, VIEW_W, 11);
+    text('LIVES ' + '*'.repeat(Math.max(0, lives)), 4, 2, '#ff8fb1', 1);
+    text('SCORE ' + String(score).padStart(5, '0'), VIEW_W - 4, 2, '#fff1a6', 1, 'right');
+    text('ENEMIES LEFT ' + enemies.length, 4, VIEW_H - 9, '#bfe3ff', 1);
+    if (msgTimer > 0) text('FIND THE EXIT >', VIEW_W / 2, 16, '#ffd23f', 1, 'center');
   }
   function drawTitle() {
-    ctx.fillStyle = 'rgba(10,6,20,0.78)'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    text('B U B B L E G A M E', VIEW_W / 2, 64, '#a8f0c6', 14, 'center');
-    text('explore the caverns — find the hidden exit', VIEW_W / 2, 92, '#ffffff', 8, 'center');
-    text('← → move    ↑ jump    Z fire bubble', VIEW_W / 2, 120, '#bfe3ff', 8, 'center');
-    text('trap enemies & jump in the bubble to pop them', VIEW_W / 2, 134, '#ff8fb1', 8, 'center');
-    if (Math.floor(anim / 24) % 2) text('PRESS ENTER', VIEW_W / 2, 168, '#ffd23f', 10, 'center');
+    ctx.fillStyle = '#0d0820'; ctx.fillRect(0, 0, VIEW_W, VIEW_H); // solid overlay
+    text('BUBBLEGAME', VIEW_W / 2, 44, '#a8f0c6', 3, 'center');
+    text('EXPLORE - FIND THE HIDDEN EXIT', VIEW_W / 2, 86, '#ffffff', 1, 'center');
+    text('ARROWS MOVE   UP JUMP   Z FIRE BUBBLE', VIEW_W / 2, 108, '#bfe3ff', 1, 'center');
+    text('TRAP ENEMIES - JUMP IN BUBBLE TO POP', VIEW_W / 2, 122, '#ff8fb1', 1, 'center');
+    if (Math.floor(anim / 24) % 2) text('PRESS ENTER OR TAP', VIEW_W / 2, 158, '#ffd23f', 2, 'center');
   }
   function drawCenter(title, color, sub) {
-    ctx.fillStyle = 'rgba(10,6,20,0.78)'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    text(title, VIEW_W / 2, 96, color, 14, 'center');
-    text('SCORE ' + score, VIEW_W / 2, 120, '#ffffff', 8, 'center');
-    if (Math.floor(anim / 24) % 2) text(sub, VIEW_W / 2, 150, '#ffd23f', 8, 'center');
+    ctx.fillStyle = '#0d0820'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    text(title, VIEW_W / 2, 80, color, 3, 'center');
+    text('SCORE ' + score, VIEW_W / 2, 116, '#ffffff', 1, 'center');
+    if (Math.floor(anim / 24) % 2) text(sub, VIEW_W / 2, 146, '#ffd23f', 1, 'center');
   }
 
   // ---- main loop (fixed 60Hz step) ----

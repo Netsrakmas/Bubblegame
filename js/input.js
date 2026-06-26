@@ -34,6 +34,13 @@ const Input = (() => {
     get fire() { return !!down.fire; },
     // True exactly once per key press.
     pressed(a) { if (justPressed[a]) { justPressed[a] = false; return true; } return false; },
+    // Drive an action from on-screen / touch buttons (held while down).
+    setVirtual(a, isDown) {
+      if (isDown) { if (!down[a]) justPressed[a] = true; down[a] = true; }
+      else down[a] = false;
+    },
+    // Fire a one-shot action (e.g. tap-to-start) without a held state.
+    pulse(a) { justPressed[a] = true; },
     clearFrame() { /* reserved */ },
   };
 })();
