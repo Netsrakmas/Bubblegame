@@ -75,6 +75,82 @@ const LEVELS = [
       { x: 30, y: 22 },
     ],
   }),
+
+  buildLevel({
+    name: 'Neon Depths',
+    w: 44,
+    h: 30,
+    rects: [
+      { ch: '=', x: 1, y: 4, w: 8 },
+      { ch: '=', x: 12, y: 6, w: 10 },
+      { ch: '=', x: 26, y: 4, w: 10 },
+      { ch: '=', x: 34, y: 8, w: 8 },
+      { ch: '=', x: 4, y: 10, w: 12 },
+      { ch: '=', x: 20, y: 12, w: 12 },
+      { ch: '=', x: 36, y: 12, w: 6 },
+      { ch: '=', x: 2, y: 16, w: 8 },
+      { ch: '=', x: 14, y: 16, w: 10 },
+      { ch: '=', x: 28, y: 18, w: 10 },
+      { ch: '=', x: 6, y: 20, w: 10 },
+      { ch: '=', x: 20, y: 22, w: 10 },
+      { ch: '=', x: 34, y: 22, w: 8 },
+      { ch: '#', x: 16, y: 26, w: 6, h: 3 }, // central mound near the floor
+      { ch: '=', x: 26, y: 26, w: 6 },
+    ],
+    player: { x: 2, y: 3 },       // start at the top — descend into the depths
+    exit: { x: 3, y: 28 },        // exit hides at the very bottom left
+    enemies: [
+      { x: 14, y: 5 },
+      { x: 30, y: 3 },
+      { x: 8, y: 9 },
+      { x: 24, y: 11 },
+      { x: 16, y: 15 },
+      { x: 32, y: 17 },
+      { x: 10, y: 19 },
+      { x: 24, y: 21 },
+      { x: 36, y: 28 },
+    ],
+  }),
+
+  buildLevel({
+    name: 'Sky Fortress',
+    w: 56,
+    h: 24,
+    rects: [
+      { ch: '=', x: 4, y: 18, w: 10 },
+      { ch: '=', x: 18, y: 18, w: 8 },
+      { ch: '=', x: 30, y: 19, w: 8 },
+      { ch: '=', x: 42, y: 18, w: 8 },
+      { ch: '=', x: 10, y: 14, w: 8 },
+      { ch: '=', x: 24, y: 14, w: 10 },
+      { ch: '=', x: 40, y: 14, w: 8 },
+      { ch: '=', x: 4, y: 10, w: 8 },
+      { ch: '=', x: 16, y: 10, w: 8 },
+      { ch: '=', x: 30, y: 10, w: 10 },
+      { ch: '=', x: 46, y: 10, w: 8 },
+      { ch: '=', x: 8, y: 6, w: 10 },
+      { ch: '=', x: 24, y: 6, w: 8 },
+      { ch: '=', x: 38, y: 6, w: 8 },
+      { ch: '=', x: 48, y: 5, w: 7 },       // exit perch, top right
+      { ch: '#', x: 14, y: 20, w: 3, h: 3 }, // watchtowers on the ground
+      { ch: '#', x: 36, y: 21, w: 4, h: 2 },
+    ],
+    player: { x: 2, y: 21 },
+    exit: { x: 52, y: 4 },
+    enemies: [
+      { x: 6, y: 17 },
+      { x: 20, y: 17 },
+      { x: 44, y: 17 },
+      { x: 12, y: 13 },
+      { x: 28, y: 13 },
+      { x: 42, y: 13 },
+      { x: 8, y: 9 },
+      { x: 34, y: 9 },
+      { x: 26, y: 5 },
+      { x: 40, y: 5 },
+      { x: 50, y: 4 },
+    ],
+  }),
 ];
 
 window.TILE = TILE;

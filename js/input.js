@@ -10,15 +10,18 @@ const Input = (() => {
     ArrowLeft: 'left', KeyA: 'left',
     ArrowRight: 'right', KeyD: 'right',
     ArrowUp: 'jump', KeyW: 'jump', Space: 'jump',
+    ArrowDown: 'down', KeyS: 'down',
     KeyJ: 'fire', KeyZ: 'fire', KeyK: 'fire',
     KeyR: 'restart',
+    KeyP: 'pause',
+    KeyM: 'mute',
     Enter: 'start',
   };
 
   window.addEventListener('keydown', (e) => {
     const a = MAP[e.code];
     if (!a) return;
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'Space'].includes(e.code)) e.preventDefault();
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault();
     if (!down[a]) justPressed[a] = true;
     down[a] = true;
   });
@@ -31,6 +34,7 @@ const Input = (() => {
     get left() { return !!down.left; },
     get right() { return !!down.right; },
     get jump() { return !!down.jump; },
+    get down() { return !!down.down; },
     get fire() { return !!down.fire; },
     // True exactly once per key press.
     pressed(a) { if (justPressed[a]) { justPressed[a] = false; return true; } return false; },

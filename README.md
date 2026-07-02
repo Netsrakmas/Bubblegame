@@ -1,10 +1,14 @@
 # 🫧 Bubblegame
 
 An **8-bit, old-school arcade** platformer in the spirit of *Bubble Bobble* — but
-on a **much bigger map** with a twist: there's **no minimap**, and the goal isn't
+on **much bigger maps** with a twist: there's **no minimap**, and the goal isn't
 to clear every enemy. **You have to explore and find the hidden exit.** Trap
-enemies in bubbles and pop them if they're in your way… or just bubble past them
-and keep looking for the door.
+enemies in bubbles and pop them for fruit — **chain pops for better fruit** — or
+bounce off your own bubbles to reach high ledges and keep looking for the door.
+
+**3 levels**, chiptune sound & music (all synthesized, zero assets), particles,
+screen shake, combo chains, angry escaped enemies, high scores — everything in
+vanilla JS.
 
 Everything is **vanilla HTML5 Canvas + JavaScript** — no build step, no
 dependencies. It also ships with two tiny tools so the cute pixel art and the
@@ -34,14 +38,22 @@ Open `index.html` in a browser. That's it.
 | --- | --- |
 | Move | `←` `→` or `A` `D` |
 | Jump | `↑` / `Space` / `W` |
-| Fire bubble | `Z` / `J` |
+| Drop through platform | `↓` + jump |
+| Fire bubble | `Z` / `J` / `K` |
+| Pause | `P` |
+| Mute | `M` |
 | Start / confirm | `Enter` |
 | Restart | `R` |
 
+On phones/tablets an on-screen pad appears automatically.
+
 **How to play.** Shoot a bubble at an enemy to trap it, then **jump into the
-bubble to pop it** (+100). Trapped enemies break free if you wait too long. You
-don't need to beat them all — climb the caverns, poke around, and **find the
-exit door** (the gold-framed door 🚪) to win.
+bubble to pop it** — the enemy drops **fruit** (berry +100 → banana +300 →
+gem +500: pop quickly in a row to chain up). Trapped enemies break free if you
+wait too long, and they come back **angry and fast**. Stomp an **empty** bubble
+to bounce off it — that's how you reach the really high ledges. You don't need
+to beat every enemy — climb the caverns, poke around, and **find the exit door**
+(the gold-framed door 🚪, it glimmers) to clear each of the 3 levels.
 
 ---
 
@@ -110,21 +122,25 @@ player_idle: [
 ## 📁 Project layout
 
 ```
-index.html              game shell
+index.html              game shell + touch controls
 js/palette.js           shared 16-colour palette + sprite→canvas baker
 js/sprites.js           built-in kawaii sprites (string-grid art)
-js/levels.js            level format + the starter level (built from a spec)
-js/input.js             keyboard
-js/game.js              engine: physics, tile collision, camera, bubbles, enemies
+js/levels.js            level format + the 3 built-in levels (built from specs)
+js/audio.js             synthesized chiptune SFX + music loop (WebAudio)
+js/input.js             keyboard + virtual-button input
+js/game.js              engine: physics, tiles, camera, bubbles, fruit, particles
 tools/sprite-editor.html
 tools/map-editor.html
 ```
 
+Custom levels saved from the map editor play as a standalone level; delete the
+saved level (or clear the browser's site data) to get the built-in campaign back.
+
 ## 🛠️ Ideas to extend
 
 - More enemy types (flyers, chasers) — they're just `x` spawns + a behaviour.
-- Multiple levels / a level-select that reads several entries from `js/levels.js`.
-- Sound effects, a 2nd player (Bub & Bob), collectible fruit for score.
-- Drop-through platforms (hold `↓`), checkpoints, or a fog-of-war minimap reward.
+- More levels — append `buildLevel({...})` specs to `js/levels.js`.
+- A 2nd player (Bub & Bob), checkpoints, or a fog-of-war minimap reward.
+- Boss floors, water/wind currents that carry bubbles somewhere useful.
 
 Made to be hacked on — open an editor and make it yours. 💚

@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Bubblegame</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🫧</text></svg>" />
   <style>
     :root { --bg: #0d0820; --ink: #e9e4ff; --accent: #a8f0c6; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -62,6 +63,7 @@
   <div id="pad">
     <div class="cluster">
       <div class="btn" data-act="left">◀</div>
+      <div class="btn" data-act="down">▼</div>
       <div class="btn" data-act="right">▶</div>
     </div>
     <div class="btn small restart" data-act="restart">↻</div>
@@ -71,10 +73,11 @@
     </div>
   </div>
 
-  <div class="hint">←/→ move &nbsp;·&nbsp; ↑ / Space jump &nbsp;·&nbsp; Z / J fire bubble &nbsp;·&nbsp; R restart &nbsp;·&nbsp; or use the buttons</div>
+  <div class="hint">←/→ move &nbsp;·&nbsp; ↑ / Space jump &nbsp;·&nbsp; ↓+jump drop &nbsp;·&nbsp; Z / J bubble &nbsp;·&nbsp; P pause &nbsp;·&nbsp; M mute &nbsp;·&nbsp; R restart</div>
   <div class="links">
     <a href="tools/sprite-editor.html">🎨 Sprite Editor</a>
     <a href="tools/map-editor.html">🗺️ Map Editor</a>
+    <a href="#" id="mute" title="toggle sound">🔊 Sound</a>
   </div>
 
   <!-- classic scripts (no bundler) so this runs by just opening the file -->
@@ -82,6 +85,7 @@
   <script src="js/font.js"></script>
   <script src="js/sprites.js"></script>
   <script src="js/levels.js"></script>
+  <script src="js/audio.js"></script>
   <script src="js/input.js"></script>
   <script src="js/game.js"></script>
 
@@ -98,7 +102,7 @@
     if (isTouch) pad.classList.add('show');
 
     const btns = [...pad.querySelectorAll('.btn')];
-    const HOLD = ['left', 'right', 'jump', 'fire'];
+    const HOLD = ['left', 'right', 'down', 'jump', 'fire'];
     const pointers = new Map(); // pointerId -> held action
 
     function hitAct(x, y) {
@@ -142,6 +146,12 @@
 
     // Tap the screen to start / confirm (title, win, game-over).
     document.getElementById('game').addEventListener('pointerdown', () => Input.pulse('start'));
+
+    // Sound toggle link (works on desktop + mobile; game's M key does the same).
+    const muteLink = document.getElementById('mute');
+    const muteLabel = () => { muteLink.textContent = Sfx.muted ? '🔇 Muted' : '🔊 Sound'; };
+    muteLink.addEventListener('click', (e) => { e.preventDefault(); Sfx.toggle(); muteLabel(); });
+    muteLabel();
   </script>
 </body>
 </html>
