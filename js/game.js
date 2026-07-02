@@ -508,7 +508,7 @@
       ctx.fillRect((sx + VIEW_W) % VIEW_W, sy, 1, 1);
     }
 
-    if (state === 'title') { anim2Title(); return; }
+    if (state === 'title') { drawTitle(); return; }
 
     ctx.save();
     ctx.translate(-cx, -cy);
@@ -619,7 +619,7 @@
   const deco = Array.from({ length: 8 }, (_, i) => ({
     x: (i * 37 + 14) % (VIEW_W - 24), spd: 0.25 + (i % 4) * 0.12, off: i * 47,
   }));
-  function anim2Title() {
+  function drawTitle() {
     ctx.fillStyle = '#0d0820'; ctx.fillRect(0, 0, VIEW_W, VIEW_H); // solid overlay
     ctx.fillStyle = '#3a2e6e';
     for (let i = 0; i < 40; i++) ctx.fillRect((i * 71) % VIEW_W, (i * 53) % VIEW_H, 1, 1);
