@@ -47,6 +47,7 @@ const Sfx = (() => {
     pop:     () => { const t = now(); tone('square', 660, 180, t, 0.08, 0.07); tone('square', 990, 330, t, 0.05, 0.04); },
     collect: () => { const t = now(); tone('square', 784, 784, t, 0.06, 0.05); tone('square', 1175, 1175, t + 0.06, 0.10, 0.05); },
     hurt:    () => tone('sawtooth', 300, 70, now(), 0.30, 0.08),
+    checkpoint: () => { const t = now(); tone('triangle', 523, 784, t, 0.09, 0.07); tone('triangle', 784, 1047, t + 0.09, 0.14, 0.07); },
     clear:   () => { const t = now(); [523, 659, 784, 1047].forEach((f, i) => tone('square', f, f, t + i * 0.09, 0.13, 0.06)); },
     win:     () => { const t = now(); [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone('square', f, f, t + i * 0.11, 0.15, 0.06)); },
     lose:    () => { const t = now(); [392, 330, 262, 196].forEach((f, i) => tone('triangle', f, f * 0.94, t + i * 0.16, 0.22, 0.08)); },

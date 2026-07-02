@@ -55,6 +55,14 @@ to bounce off it — that's how you reach the really high ledges. You don't need
 to beat every enemy — climb the caverns, poke around, and **find the exit door**
 (the gold-framed door 🚪, it glimmers) to clear each of the 3 levels.
 
+**Know your foes.** *Walkers* patrol and turn at ledges. *Flyers* (lavender
+bats) ignore gravity and drift toward your altitude. *Chasers* (spiky orange
+hotheads) patrol until they spot you — then they sprint, even straight off
+ledges. All of them can be bubbled.
+
+**Checkpoints.** Touch a lantern 🏮 to light it — if you lose a life you
+respawn there instead of back at the start. Lanterns reset each level.
+
 ---
 
 ## 🎨 Sprite Editor — `tools/sprite-editor.html`
@@ -114,8 +122,11 @@ player_idle: [
 | `#` | solid block |
 | `=` | one-way platform |
 | `E` | exit |
+| `C` | checkpoint lantern |
 | `P` | player start |
-| `x` | enemy spawn |
+| `x` | walker spawn |
+| `f` | flyer spawn (no gravity, drifts at you) |
+| `c` | chaser spawn (sprints when it sees you) |
 
 ---
 
@@ -138,9 +149,9 @@ saved level (or clear the browser's site data) to get the built-in campaign back
 
 ## 🛠️ Ideas to extend
 
-- More enemy types (flyers, chasers) — they're just `x` spawns + a behaviour.
+- More enemy behaviours — a kind is ~15 lines in `updateEnemies` + 2 sprites.
 - More levels — append `buildLevel({...})` specs to `js/levels.js`.
-- A 2nd player (Bub & Bob), checkpoints, or a fog-of-war minimap reward.
+- A 2nd player (Bub & Bob), or a fog-of-war minimap reward.
 - Boss floors, water/wind currents that carry bubbles somewhere useful.
 
 Made to be hacked on — open an editor and make it yours. 💚

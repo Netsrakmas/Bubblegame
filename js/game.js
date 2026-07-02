@@ -29,6 +29,10 @@
   const JUMP_BUFFER = 7;     // frames a jump press is remembered before landing
   const ENEMY_SPEED = 0.5;
   const ANGRY_MULT = 1.9;    // escaped enemies are furious and fast
+  const FLY_SPEED = 0.55;    // flyers drift, ignoring gravity
+  const FLY_HOME = 0.22;     // how hard a flyer homes toward your altitude
+  const CHASE_SPEED = 1.05;  // chasers sprint when they spot you
+  const CHASE_RANGE_X = 90, CHASE_RANGE_Y = 28;
   const BUBBLE_SHOT_SPEED = 4;
   const BUBBLE_SHOT_FRAMES = 16;
   const BUBBLE_RISE = -0.45;
@@ -60,9 +64,10 @@
       const custom = JSON.parse(localStorage.getItem('bubblegame.sprites') || 'null');
       if (custom && typeof custom === 'object') set = Object.assign(set, custom);
     } catch (e) { /* ignore bad data */ }
-    // angry (escaped) enemy variants: recolour purple body -> red
-    for (const n of ['enemy_a', 'enemy_b']) {
-      if (Array.isArray(set[n])) set[n + '_angry'] = set[n].map((r) => r.replace(/c/g, 'e'));
+    // angry (escaped) enemy variants: recolour each body colour -> red
+    const ANGRY_BODY = { enemy_a: 'c', enemy_b: 'c', flyer_a: 'b', flyer_b: 'b', chaser_a: 'd', chaser_b: 'd' };
+    for (const n in ANGRY_BODY) {
+      if (Array.isArray(set[n])) set[n + '_angry'] = set[n].map((r) => r.split(ANGRY_BODY[n]).join('e'));
     }
     baked = {};
     for (const name in set) {
@@ -79,7 +84,7 @@
 
   // ---- level ----
   let level, rows, LW, LH, levelPxW, levelPxH;
-  let playerSpawn, enemySpawns, exitTiles;
+  let playerSpawn, respawnPoint, enemySpawns, exitTiles, checkpointsLit;
   let levelIndex = 0, customOnly = false;
   function levelList() {
     let custom = null;
@@ -97,19 +102,24 @@
     playerSpawn = { x: T, y: T };
     enemySpawns = [];
     exitTiles = [];
+    checkpointsLit = new Set();
     for (let ty = 0; ty < LH; ty++) {
       for (let tx = 0; tx < LW; tx++) {
         const ch = rows[ty][tx];
         if (ch === 'P') playerSpawn = { x: tx * T + 2, y: ty * T };
-        else if (ch === 'x') enemySpawns.push({ x: tx * T + 2, y: ty * T });
+        else if (ch === 'x') enemySpawns.push({ x: tx * T + 2, y: ty * T, kind: 'walk' });
+        else if (ch === 'f') enemySpawns.push({ x: tx * T + 2, y: ty * T, kind: 'fly' });
+        else if (ch === 'c') enemySpawns.push({ x: tx * T + 2, y: ty * T, kind: 'chase' });
         else if (ch === 'E') exitTiles.push({ x: tx, y: ty });
       }
     }
+    respawnPoint = playerSpawn;
   }
   const tileChar = (tx, ty) => (rows[ty] && rows[ty][tx]) || '#'; // OOB = wall
   const isSolid = (tx, ty) => tileChar(tx, ty) === '#';
   const isPlatform = (tx, ty) => tileChar(tx, ty) === '=';
   const isExit = (tx, ty) => tileChar(tx, ty) === 'E';
+  const isCheckpoint = (tx, ty) => tileChar(tx, ty) === 'C';
 
   // ---- collision helpers (AABB vs tile grid) ----
   function moveX(e) {
@@ -149,19 +159,20 @@
   let chain = 0, chainT = 0, deadT = 0, clearT = 0, shake = 0;
   try { hi = +localStorage.getItem('bubblegame.hi') || 0; } catch (e) { hi = 0; }
 
-  function makePlayer() {
-    return { x: playerSpawn.x, y: playerSpawn.y, w: 12, h: 14, vx: 0, vy: 0,
+  function makePlayer(at = respawnPoint) {
+    return { x: at.x, y: at.y, w: 12, h: 14, vx: 0, vy: 0,
       face: 1, onGround: false, invuln: 0, fireCd: 0, coyote: 0, jumpBuf: 0, dropThru: 0 };
   }
   function makeEnemy(s) {
     return { x: s.x, y: s.y, w: 12, h: 12, vx: 0, vy: 0, dir: Math.random() < 0.5 ? -1 : 1,
-      onGround: false, angry: false };
+      onGround: false, angry: false, kind: s.kind || 'walk',
+      wob: Math.random() * 6.28, chasing: false };
   }
   function spawnEnemies() { enemies = enemySpawns.map(makeEnemy); }
 
   function enterLevel() {
     loadLevel();
-    player = makePlayer();
+    player = makePlayer(playerSpawn);
     spawnEnemies();
     bubbles = []; fruits = [];
     chain = 0; chainT = 0;
@@ -333,8 +344,18 @@
 
     if (p.invuln > 0) p.invuln--;
 
-    // exit check
+    // checkpoint + exit checks
     const cx = Math.floor((p.x + p.w / 2) / T), cy = Math.floor((p.y + p.h / 2) / T);
+    if (isCheckpoint(cx, cy)) {
+      const key = cx + ',' + cy;
+      if (!checkpointsLit.has(key)) {
+        checkpointsLit.add(key);
+        respawnPoint = { x: cx * T + 2, y: cy * T };
+        addFloater(cx * T - 8, cy * T - 12, 'CHECKPOINT!', '#a8f0c6');
+        sparkle(cx * T + 8, cy * T + 4, '#ffd23f', 10);
+        sfx('checkpoint');
+      }
+    }
     if (isExit(cx, cy)) {
       state = 'clear'; clearT = 130;
       score += CLEAR_BONUS;
@@ -356,19 +377,45 @@
 
   function updateEnemies() {
     for (const e of enemies) {
-      const spd = ENEMY_SPEED * (e.angry ? ANGRY_MULT : 1);
-      e.vy = Math.min(e.vy + GRAVITY, 9);
-      moveY(e);
-      // patrol: turn at walls and ledges
-      e.vx = e.dir * spd;
-      if (e.onGround) {
-        const frontX = e.dir > 0 ? e.x + e.w + 1 : e.x - 1;
-        const ftx = Math.floor(frontX / T), fty = Math.floor((e.y + e.h) / T);
-        if (!isSolid(ftx, fty) && !isPlatform(ftx, fty)) e.dir *= -1; // ledge
+      const rage = e.angry ? ANGRY_MULT : 1;
+      if (e.kind === 'fly') {
+        // no gravity: bob on a sine wave, drift, and slowly home to your altitude
+        e.wob += 0.07;
+        const dy = (player.y + player.h / 2) - (e.y + e.h / 2);
+        e.vy = Math.sin(e.wob) * 0.5 + Math.sign(dy) * Math.min(Math.abs(dy) * 0.02, FLY_HOME) * rage;
+        moveY(e);
+        e.vx = e.dir * FLY_SPEED * rage;
+        e.hitWall = false;
+        moveX(e);
+        if (e.hitWall) e.dir *= -1;
+      } else {
+        // grounded kinds fall, patrol, turn at walls
+        let spd = ENEMY_SPEED * rage;
+        let ledgeTurn = true;
+        if (e.kind === 'chase') {
+          const dx = (player.x + player.w / 2) - (e.x + e.w / 2);
+          const dy = (player.y + player.h / 2) - (e.y + e.h / 2);
+          const spotted = Math.abs(dx) < CHASE_RANGE_X && Math.abs(dy) < CHASE_RANGE_Y;
+          if (spotted && !e.chasing) addFloater(e.x + 2, e.y - 12, '!', '#ff6b6b');
+          e.chasing = spotted;
+          if (spotted) {
+            e.dir = dx < 0 ? -1 : 1;
+            spd = CHASE_SPEED * rage;
+            ledgeTurn = false;      // hotheads sprint right off ledges
+          }
+        }
+        e.vy = Math.min(e.vy + GRAVITY, 9);
+        moveY(e);
+        e.vx = e.dir * spd;
+        if (e.onGround && ledgeTurn) {
+          const frontX = e.dir > 0 ? e.x + e.w + 1 : e.x - 1;
+          const ftx = Math.floor(frontX / T), fty = Math.floor((e.y + e.h) / T);
+          if (!isSolid(ftx, fty) && !isPlatform(ftx, fty)) e.dir *= -1; // ledge
+        }
+        e.hitWall = false;
+        moveX(e);
+        if (e.hitWall) e.dir *= -1;
       }
-      e.hitWall = false;
-      moveX(e);
-      if (e.hitWall) e.dir *= -1;
 
       // hit player
       if (player.invuln === 0 && overlap(e, player)) { hitPlayer(); return; }
@@ -472,6 +519,7 @@
   }
 
   // ---- render ----
+  const KIND_SPRITE = { walk: 'enemy', fly: 'flyer', chase: 'chaser' };
   let camX = 0, camY = 0;
   function camTarget() {
     const p = player;
@@ -522,6 +570,7 @@
         if (ch === '#') drawSprite('tile_block', tx * T, ty * T, false);
         else if (ch === '=') drawSprite('tile_platform', tx * T, ty * T, false);
         else if (ch === 'E') drawSprite('tile_exit', tx * T, ty * T, false);
+        else if (ch === 'C') drawSprite(checkpointsLit.has(tx + ',' + ty) ? 'checkpoint_on' : 'checkpoint_off', tx * T, ty * T, false);
       }
     }
 
@@ -542,14 +591,17 @@
         ctx.save();
         ctx.translate(b.x + b.w / 2, b.y + b.h / 2);
         ctx.scale(0.5, 0.5); // clean half-size -> stays solid pixels
-        drawSprite(e.angry ? 'enemy_a_angry' : 'enemy_a', -8, -8, e.dir < 0);
+        const trapped = KIND_SPRITE[e.kind] || 'enemy';
+        drawSprite(e.angry ? trapped + '_a_angry' : trapped + '_a', -8, -8, e.dir < 0);
         ctx.restore();
       }
     }
 
     // enemies
     for (const e of enemies) {
-      const base = (Math.floor(anim / (e.angry ? 8 : 14)) % 2) ? 'enemy_b' : 'enemy_a';
+      const kind = KIND_SPRITE[e.kind] || 'enemy';
+      const rate = e.kind === 'fly' ? 8 : (e.chasing || e.angry) ? 8 : 14;
+      const base = kind + ((Math.floor(anim / rate) % 2) ? '_b' : '_a');
       drawSprite(e.angry ? base + '_angry' : base, e.x - 2, e.y - 4, e.dir < 0);
     }
 

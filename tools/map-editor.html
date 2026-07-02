@@ -72,7 +72,7 @@
         <button id="exportBtn">⬆ export ↑</button>
         <button id="importBtn">⬇ import from box</button>
       </div>
-      <small>Legend &nbsp; <b>#</b> solid &nbsp; <b>=</b> platform &nbsp; <b>E</b> exit &nbsp; <b>P</b> player &nbsp; <b>x</b> enemy &nbsp; <b>.</b> air</small>
+      <small>Legend &nbsp; <b>#</b> solid &nbsp; <b>=</b> platform &nbsp; <b>E</b> exit &nbsp; <b>C</b> checkpoint &nbsp; <b>P</b> player &nbsp; <b>x</b> walker &nbsp; <b>f</b> flyer &nbsp; <b>c</b> chaser &nbsp; <b>.</b> air</small>
     </div>
   </div>
 
@@ -91,17 +91,20 @@ const mx = map.getContext('2d');
 
 // pre-bake the tile/marker sprites for the preview
 const baked = {};
-for (const n of ['tile_block','tile_platform','tile_exit','player_idle','enemy_a'])
+for (const n of ['tile_block','tile_platform','tile_exit','checkpoint_on','player_idle','enemy_a','flyer_a','chaser_a'])
   baked[n] = bakeSprite(SPRITES[n], 1);
 
 // ---- tile palette ----
 const TILE_DEFS = [
-  { ch:'.', name:'air',      color:'#241846' },
-  { ch:'#', name:'solid',    sprite:'tile_block' },
-  { ch:'=', name:'platform', sprite:'tile_platform' },
-  { ch:'E', name:'exit',     sprite:'tile_exit' },
-  { ch:'P', name:'player',   sprite:'player_idle' },
-  { ch:'x', name:'enemy',    sprite:'enemy_a' },
+  { ch:'.', name:'air',        color:'#241846' },
+  { ch:'#', name:'solid',      sprite:'tile_block' },
+  { ch:'=', name:'platform',   sprite:'tile_platform' },
+  { ch:'E', name:'exit',       sprite:'tile_exit' },
+  { ch:'C', name:'checkpoint', sprite:'checkpoint_on' },
+  { ch:'P', name:'player',     sprite:'player_idle' },
+  { ch:'x', name:'walker',     sprite:'enemy_a' },
+  { ch:'f', name:'flyer',      sprite:'flyer_a' },
+  { ch:'c', name:'chaser',     sprite:'chaser_a' },
 ];
 const tilesWrap = document.getElementById('tiles');
 TILE_DEFS.forEach(t=>{
@@ -151,7 +154,7 @@ function draw(){
 }
 function updateStatus(){
   let enemies=0,hasP=false,hasE=false;
-  for(const row of grid)for(const c of row){ if(c==='x')enemies++; if(c==='P')hasP=true; if(c==='E')hasE=true; }
+  for(const row of grid)for(const c of row){ if(c==='x'||c==='f'||c==='c')enemies++; if(c==='P')hasP=true; if(c==='E')hasE=true; }
   document.getElementById('status').textContent =
     `${W}×${H} tiles · enemies:${enemies} · player:${hasP?'set':'MISSING'} · exit:${hasE?'set':'MISSING'}`;
 }
@@ -200,7 +203,7 @@ document.getElementById('exportBtn').onclick=()=>{
   document.getElementById('io').value=`{\n  name: '${name}',\n  tileSize: 16,\n  rows: [\n${body}\n  ],\n}`;
 };
 document.getElementById('importBtn').onclick=()=>{
-  const m=document.getElementById('io').value.match(/'([.#=ExP]+)'/g);
+  const m=document.getElementById('io').value.match(/'([.#=ExPCfc]+)'/g);
   if(!m){ alert('No rows found. Paste lines like \'##..==..E\''); return; }
   loadRows(m.map(s=>s.replace(/'/g,'')));
 };

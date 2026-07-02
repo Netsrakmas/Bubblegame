@@ -8,8 +8,11 @@
  *   '#'  solid block   (collides on all sides)
  *   '='  platform      (one-way: land on top, jump up through)
  *   'E'  exit          (touch it to clear the level)
+ *   'C'  checkpoint    (touch to light it — you respawn there)
  *   'P'  player spawn  (air tile, marks where the player starts)
- *   'x'  enemy spawn   (air tile, an enemy drops in here)
+ *   'x'  enemy spawn   (air tile, a walker patrols here)
+ *   'f'  flyer spawn   (a bat that ignores gravity and drifts at you)
+ *   'c'  chaser spawn  (a hothead that sprints when it spots you)
  *
  * The map editor (tools/map-editor.html) reads and writes exactly this.
  * Below we *build* the starter level from a compact spec so the grid
@@ -41,6 +44,9 @@ function buildLevel(spec) {
   put(spec.player, 'P');
   put(spec.exit, 'E');
   for (const e of spec.enemies || []) put(e, 'x');
+  for (const e of spec.flyers || []) put(e, 'f');
+  for (const e of spec.chasers || []) put(e, 'c');
+  for (const c of spec.checkpoints || []) put(c, 'C');
 
   return {
     name: spec.name,
@@ -74,6 +80,8 @@ const LEVELS = [
       { x: 18, y: 16 },
       { x: 30, y: 22 },
     ],
+    flyers: [{ x: 20, y: 7 }],
+    checkpoints: [{ x: 15, y: 16 }], // on the long mid platform
   }),
 
   buildLevel({
@@ -110,6 +118,9 @@ const LEVELS = [
       { x: 24, y: 21 },
       { x: 36, y: 28 },
     ],
+    flyers: [{ x: 22, y: 8 }, { x: 12, y: 24 }],
+    chasers: [{ x: 26, y: 28 }],           // guards the exit run at the bottom
+    checkpoints: [{ x: 8, y: 15 }],        // halfway down the descent
   }),
 
   buildLevel({
@@ -150,6 +161,9 @@ const LEVELS = [
       { x: 40, y: 5 },
       { x: 50, y: 4 },
     ],
+    flyers: [{ x: 20, y: 8 }, { x: 44, y: 8 }],
+    chasers: [{ x: 10, y: 21 }, { x: 30, y: 21 }], // ground-floor sprinters
+    checkpoints: [{ x: 27, y: 13 }],               // mid-climb rest stop
   }),
 ];
 
